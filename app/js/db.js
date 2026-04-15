@@ -37,6 +37,17 @@
     return out;
   }
 
+  // Replace the payment-methods list with the curated seed. Preserves stored transaction
+  // paymentMethod values — if a tx references a removed method, it keeps the text but
+  // won't appear in the dropdown anymore.
+  function migratePaymentMethods() {
+    if (localStorage.getItem('budgetplus.migrated_pms_v2') === '1') return;
+    write(K.pms, window.SEED.paymentMethods.map(function(p){
+      return Object.assign({ id: uid() }, p);
+    }));
+    localStorage.setItem('budgetplus.migrated_pms_v2', '1');
+  }
+
   // Repair any transactions that were persisted with id=undefined (past bug).
   function repairIds() {
     var arr = listTransactions();
@@ -102,6 +113,7 @@
   function resetAll() {
     Object.keys(K).forEach(function(k){ localStorage.removeItem(K[k]); });
     localStorage.removeItem('budgetplus.migrated_underscores');
+    localStorage.removeItem('budgetplus.migrated_pms_v2');
     ensureSeed();
   }
 
@@ -180,7 +192,7 @@
   function setSettings(patch) { write(K.settings, Object.assign({}, getSettings(), patch)); }
 
   window.DB = {
-    ensureSeed: ensureSeed, migrateUnderscores: migrateUnderscores, repairIds: repairIds, resetAll: resetAll,
+    ensureSeed: ensureSeed, migrateUnderscores: migrateUnderscores, migratePaymentMethods: migratePaymentMethods, repairIds: repairIds, resetAll: resetAll,
     currentMonth: currentMonth, monthLabel: monthLabel, monthsAround: monthsAround, monthsOfYear: monthsOfYear,
     listCategories: listCategories, upsertCategory: upsertCategory, deleteCategory: deleteCategory,
     listSubcategories: listSubcategories, setSubcategories: setSubcategories, addSubcategory: addSubcategory, removeSubcategory: removeSubcategory,

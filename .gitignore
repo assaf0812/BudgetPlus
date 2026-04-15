@@ -1,3 +1,7 @@
 *.log
 *.tmp
 .env
+
+# JetBrains IDE settings
+.idea/
+*.iml

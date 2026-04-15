@@ -95,10 +95,16 @@ canvas { max-width:100%; }
 /* Dashboard charts — fixed heights so Chart.js doesn't expand infinitely. */
 .charts-row { display:flex; gap:24px; align-items:stretch; flex-wrap:wrap; }
 .chart-box  { display:flex; flex-direction:column; min-width:0; }
-.chart-pie  { flex: 0 0 320px; max-width: 320px; }
-.chart-bar  { flex: 1 1 420px; min-width:0; }
+.chart-pie  { flex: 0 0 300px; max-width: 300px; }
+.chart-bar  { flex: 1 1 360px; min-width:0; }
+.chart-pm   { flex: 0 0 280px; max-width: 280px; }
 .chart-canvas-wrap { position:relative; height:260px; width:100%; }
 .chart-canvas-wrap > canvas { position:absolute; inset:0; width:100% !important; height:100% !important; }
+.pm-table-wrap { max-height:260px; overflow-y:auto; }
+.chart-pm .tbl th, .chart-pm .tbl td { padding:6px 10px; font-size:13px; }
+@media (max-width: 1100px) {
+  .chart-pm { flex: 1 1 100%; max-width:100%; }
+}
 @media (max-width: 760px) {
   .chart-pie { flex: 1 1 100%; max-width:100%; }
   .chart-bar { flex: 1 1 100%; }

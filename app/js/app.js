@@ -2,6 +2,7 @@
 (function () {
   DB.ensureSeed();
   DB.migrateUnderscores();
+  DB.migratePaymentMethods();
   DB.repairIds();
 
   var ROUTES = [
@@ -122,8 +123,8 @@
 
     var kpis =
       kpi('הכנסות (חודש)', CALC.fmt(s.incomeTotal), 'text-em') +
-      kpi('הוצאות בפועל',  CALC.fmt(s.totals.actual), 'text-red') +
       kpi('תקציב הוצאות',  CALC.fmt(s.totals.budget)) +
+      kpi('הוצאות בפועל',  CALC.fmt(s.totals.actual), 'text-red') +
       kpi('מאזן',           CALC.fmt(s.net), s.net>=0?'text-em':'text-red');
 
     var pmRows = pmPivot.map(function(r){
@@ -138,9 +139,9 @@
           '<h2 style="font-weight:600;font-size:18px">דשבורד — '+esc(DB.monthLabel(state.month))+'</h2>' +
         '</div>' +
         '<div class="grid grid-cols-4">'+kpis+'</div>' +
-        (window.Chart ?
-          '<div class="card">' +
-            '<div class="charts-row">' +
+        '<div class="card">' +
+          '<div class="charts-row">' +
+            (window.Chart ?
               '<div class="chart-box chart-pie">' +
                 '<div style="font-weight:600;margin-bottom:8px">פילוח הוצאות</div>' +
                 '<div class="chart-canvas-wrap"><canvas id="c-pie"></canvas></div>' +
@@ -148,19 +149,16 @@
               '<div class="chart-box chart-bar">' +
                 '<div style="font-weight:600;margin-bottom:8px">תקציב מול ביצוע</div>' +
                 '<div class="chart-canvas-wrap"><canvas id="c-bar"></canvas></div>' +
-              '</div>' +
+              '</div>'
+            : '<div class="muted">הגרפים לא נטענו (Chart.js לא זמין).</div>') +
+            '<div class="chart-box chart-pm">' +
+              '<div style="font-weight:600;margin-bottom:8px">פילוח לפי אמצעי תשלום</div>' +
+              '<div class="pm-table-wrap"><table class="tbl">' +
+                '<thead><tr><th>קבוצה</th><th>סה"כ</th></tr></thead>' +
+                '<tbody>'+(pmRows || '<tr><td colspan="2" class="text-center muted">אין נתונים</td></tr>')+'</tbody>' +
+              '</table></div>' +
             '</div>' +
-          '</div>'
-          : '<div class="card muted">הגרפים לא נטענו (Chart.js לא זמין).</div>') +
-        '<div class="grid grid-cols-2">' +
-          '<div class="card">' +
-            '<div style="font-weight:600;margin-bottom:12px">פילוח לפי אמצעי תשלום</div>' +
-            '<table class="tbl">' +
-              '<thead><tr><th>קבוצה</th><th>סה"כ</th></tr></thead>' +
-              '<tbody>'+(pmRows || '<tr><td colspan="2" class="text-center muted">אין נתונים</td></tr>')+'</tbody>' +
-            '</table>' +
           '</div>' +
-          '<div></div>' +
         '</div>' +
       '</div>';
 
