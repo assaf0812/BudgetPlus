@@ -5,8 +5,12 @@
   DB.migratePaymentMethods();
   DB.repairIds();
 
+  function applyTheme() {
+    document.body.classList.toggle('dark', !!DB.getSettings().darkMode);
+  }
+  applyTheme();
+
   var ROUTES = [
-    { path:'dashboard',  label:'דשבורד',       icon:'📊' },
     { path:'month',      label:'חודש נוכחי',    icon:'📅' },
     { path:'yearly',     label:'סיכום שנתי',    icon:'📈' },
     { path:'categories', label:'קטגוריות',      icon:'🗂️' },
@@ -31,9 +35,9 @@
     return String(s).replace(/[&<>"']/g, function(c){ return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]; });
   }
   function currentRoute() {
-    var h = (location.hash || '#/dashboard').replace(/^#\//,'');
+    var h = (location.hash || '#/month').replace(/^#\//,'');
     var parts = h.split('/');
-    return { page: parts[0] || 'dashboard', arg: parts[1] };
+    return { page: parts[0] || 'month', arg: parts[1] };
   }
   function navigate(page, arg) {
     location.hash = '#/' + page + (arg ? '/'+arg : '');
@@ -50,7 +54,7 @@
     destroyCharts();
     var r = currentRoute();
     var title = (ROUTES.find(function(x){return x.path===r.page;}) || ROUTES[0]).label;
-    var showMonth = ['dashboard','month','transactions'].indexOf(r.page) !== -1;
+    var showMonth = ['month','transactions'].indexOf(r.page) !== -1;
 
     var root = document.getElementById('root');
     root.innerHTML =
@@ -69,14 +73,13 @@
     if (showMonth) attachMonthPickerEvents();
 
     switch (r.page) {
-      case 'dashboard':    renderDashboard(); break;
       case 'month':        renderMonth(); break;
       case 'transactions': renderTransactions(); break;
       case 'yearly':       renderYearly(r.arg); break;
       case 'categories':   renderCategories(); break;
       case 'payments':     renderPayments(); break;
       case 'settings':     renderSettings(); break;
-      default:             renderDashboard();
+      default:             renderMonth();
     }
   }
 
@@ -117,10 +120,7 @@
   // ------------------------------------------------------------
   // Dashboard
   // ------------------------------------------------------------
-  function renderDashboard() {
-    var s = CALC.monthlySummary(state.month);
-    var pmPivot = CALC.paymentMethodPivot(state.month);
-
+  function dashboardBlockHtml(s, pmPivot) {
     var kpis =
       kpi('הכנסות (חודש)', CALC.fmt(s.incomeTotal), 'text-em') +
       kpi('תקציב הוצאות',  CALC.fmt(s.totals.budget)) +
@@ -133,56 +133,37 @@
              '<td class="num" style="font-weight:600">'+CALC.fmt(total)+'</td></tr>';
     }).join('');
 
-    document.getElementById('page').innerHTML =
-      '<div class="grid">' +
-        '<div class="flex-between">' +
-          '<h2 style="font-weight:600;font-size:18px">דשבורד — '+esc(DB.monthLabel(state.month))+'</h2>' +
-        '</div>' +
-        '<div class="grid grid-cols-4">'+kpis+'</div>' +
-        '<div class="card">' +
-          '<div class="charts-row">' +
-            (window.Chart ?
-              '<div class="chart-box chart-pie">' +
-                '<div style="font-weight:600;margin-bottom:8px">פילוח הוצאות</div>' +
-                '<div class="chart-canvas-wrap"><canvas id="c-pie"></canvas></div>' +
-              '</div>' +
-              '<div class="chart-box chart-bar">' +
-                '<div style="font-weight:600;margin-bottom:8px">תקציב מול ביצוע</div>' +
-                '<div class="chart-canvas-wrap"><canvas id="c-bar"></canvas></div>' +
-              '</div>'
-            : '<div class="muted">הגרפים לא נטענו (Chart.js לא זמין).</div>') +
-            '<div class="chart-box chart-pm">' +
-              '<div style="font-weight:600;margin-bottom:8px">פילוח לפי אמצעי תשלום</div>' +
-              '<div class="pm-table-wrap"><table class="tbl">' +
-                '<thead><tr><th>קבוצה</th><th>סה"כ</th></tr></thead>' +
-                '<tbody>'+(pmRows || '<tr><td colspan="2" class="text-center muted">אין נתונים</td></tr>')+'</tbody>' +
-              '</table></div>' +
-            '</div>' +
+    return '<div class="grid grid-cols-4">'+kpis+'</div>' +
+      '<div class="card">' +
+        '<div class="charts-row">' +
+          (window.Chart ?
+            '<div class="chart-box chart-bar">' +
+              '<div style="font-weight:600;margin-bottom:8px">תקציב מול ביצוע</div>' +
+              '<div class="chart-canvas-wrap"><canvas id="c-bar"></canvas></div>' +
+            '</div>'
+          : '<div class="muted">הגרפים לא נטענו (Chart.js לא זמין).</div>') +
+          '<div class="chart-box chart-pm">' +
+            '<div style="font-weight:600;margin-bottom:8px">פילוח לפי אמצעי תשלום</div>' +
+            '<div class="pm-table-wrap"><table class="tbl">' +
+              '<thead><tr><th>קבוצה</th><th>סה"כ</th></tr></thead>' +
+              '<tbody>'+(pmRows || '<tr><td colspan="2" class="text-center muted">אין נתונים</td></tr>')+'</tbody>' +
+            '</table></div>' +
           '</div>' +
         '</div>' +
       '</div>';
-
-    if (window.Chart) {
-      var colors = ['#2563eb','#7c3aed','#db2777','#ea580c','#16a34a','#0891b2','#facc15','#64748b','#9333ea','#22c55e'];
-      activeChartInstances.push(new Chart(document.getElementById('c-pie'), {
-        type:'doughnut',
-        data:{ labels: s.expenseRows.map(function(r){return r.category;}),
-               datasets:[{ data: s.expenseRows.map(function(r){return r.actual;}), backgroundColor: colors }] },
-        options:{
-          plugins:{ legend:{ position:'left', rtl:true, labels:{ boxWidth:10, boxHeight:10, padding:6, font:{ size:11 } } } },
-          maintainAspectRatio:false,
-        },
-      }));
-      activeChartInstances.push(new Chart(document.getElementById('c-bar'), {
-        type:'bar',
-        data:{ labels: s.expenseRows.map(function(r){return r.category;}),
-               datasets:[
-                 { label:'תקציב', data: s.expenseRows.map(function(r){return r.budget;}), backgroundColor:'#cbd5e1' },
-                 { label:'בפועל', data: s.expenseRows.map(function(r){return r.actual;}), backgroundColor:'#2563eb' },
-               ] },
-        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ rtl:true } }, scales:{ y:{ beginAtZero:true } } },
-      }));
-    }
+  }
+  function initDashboardCharts(s) {
+    if (!window.Chart) return;
+    var colors = ['#2563eb','#7c3aed','#db2777','#ea580c','#16a34a','#0891b2','#facc15','#64748b','#9333ea','#22c55e'];
+    activeChartInstances.push(new Chart(document.getElementById('c-bar'), {
+      type:'bar',
+      data:{ labels: s.expenseRows.map(function(r){return r.category;}),
+             datasets:[
+               { label:'תקציב', data: s.expenseRows.map(function(r){return r.budget;}), backgroundColor:'#cbd5e1' },
+               { label:'בפועל', data: s.expenseRows.map(function(r){return r.actual;}), backgroundColor:'#2563eb' },
+             ] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ rtl:true } }, scales:{ y:{ beginAtZero:true } } },
+    }));
   }
   function kpi(label, value, cls) {
     return '<div class="kpi"><div class="label">'+esc(label)+'</div>' +
@@ -194,6 +175,7 @@
   // ------------------------------------------------------------
   function renderMonth() {
     var s = CALC.monthlySummary(state.month);
+    var pmPivot = CALC.paymentMethodPivot(state.month);
 
     var expenseRowsHtml = s.expenseRows.map(function(r){
       var status = CALC.budgetStatus(r.utilization, r.remaining);
@@ -211,13 +193,14 @@
       return '<tr>' +
         '<td>'+esc(l.description)+'</td>' +
         '<td><input type="number" class="input num inline-edit" data-income-default="'+esc(l.description)+'" value="'+l.projectedDefault+'"/></td>' +
-        '<td class="num text-em" style="font-weight:600">'+CALC.fmt(l.projected)+'</td>' +
         '<td class="actions"><button type="button" class="btn btn-danger btn-sm" data-action="del-income" data-arg="'+esc(l.description)+'">הסר</button></td>' +
       '</tr>';
-    }).join('') || '<tr><td colspan="4" class="text-center muted">אין סוגי הכנסה מוגדרים</td></tr>';
+    }).join('') || '<tr><td colspan="3" class="text-center muted">אין סוגי הכנסה מוגדרים</td></tr>';
 
     document.getElementById('page').innerHTML =
       '<div class="grid">' +
+        dashboardBlockHtml(s, pmPivot) +
+
         '<div class="flex-between mb-3">' +
           '<h2 style="font-weight:600;font-size:18px">דוח הוצאות והכנסות עבור חודש '+esc(DB.monthLabel(state.month))+'</h2>' +
           '<div class="flex gap-2">' +
@@ -229,11 +212,10 @@
           '<div class="card">' +
             '<h3 style="font-weight:600;margin-bottom:12px">הכנסות (משוער)</h3>' +
             '<div class="scroll-x"><table class="tbl">' +
-              '<thead><tr><th>סוג הכנסה</th><th>ברירת-מחדל</th><th>משוער</th><th></th></tr></thead>' +
+              '<thead><tr><th>סוג הכנסה</th><th>סכום</th><th></th></tr></thead>' +
               '<tbody>' + incomeRowsHtml +
-                '<tr style="background:#f1f5f9;font-weight:700">' +
+                '<tr class="totals">' +
                   '<td>סה"כ הכנסות</td>' +
-                  '<td></td>' +
                   '<td class="num text-em">'+CALC.fmt(s.incomeTotal)+'</td>' +
                   '<td></td>' +
                 '</tr>' +
@@ -249,9 +231,9 @@
           '<div class="card">' +
             '<h3 style="font-weight:600;margin-bottom:12px">הוצאות</h3>' +
             '<div class="scroll-x"><table class="tbl">' +
-              '<thead><tr><th>סוג הוצאה</th><th>תקציב</th><th>חיוב בפועל</th><th>יתרה בפועל</th><th>ניצול</th></tr></thead>' +
+              '<thead><tr><th>סוג הוצאה</th><th>תקציב</th><th>סך חיובים</th><th>יתרת תקציב</th><th>ניצול</th></tr></thead>' +
               '<tbody>' + expenseRowsHtml +
-                '<tr style="background:#f1f5f9;font-weight:700">' +
+                '<tr class="totals">' +
                   '<td>סה"כ</td>' +
                   '<td class="num">'+CALC.fmt(s.totals.budget)+'</td>' +
                   '<td class="num">'+CALC.fmt(s.totals.actual)+'</td>' +
@@ -260,18 +242,6 @@
                 '</tr>' +
               '</tbody>' +
             '</table></div>' +
-          '</div>' +
-        '</div>' +
-
-        '<div class="card" style="background:linear-gradient(135deg,#eef6ff,#fff);border:1px solid #bfdbfe">' +
-          '<div class="flex-between">' +
-            '<div>' +
-              '<div class="muted" style="font-size:12px">מאזן חודשי (הכנסות − הוצאות)</div>' +
-              '<div class="num" style="font-size:28px;font-weight:700" class="'+(s.net>=0?'text-em':'text-red')+'">'+CALC.fmt(s.net)+'</div>' +
-            '</div>' +
-            '<div class="muted" style="font-size:13px">' +
-              'הכנסות: '+CALC.fmt(s.incomeTotal)+' | הוצאות: '+CALC.fmt(s.totals.actual) +
-            '</div>' +
           '</div>' +
         '</div>' +
 
@@ -300,6 +270,7 @@
     });
     document.getElementById('export-month').addEventListener('click', function(){ exportMonthXlsx(state.month); });
 
+    initDashboardCharts(s);
     renderTxTable(document.getElementById('tx-container'), true);
   }
 
@@ -629,32 +600,78 @@
   // ------------------------------------------------------------
   function renderSettings() {
     var s = DB.getSettings();
+    var checked = s.darkMode ? 'checked' : '';
+
+    // Collect all known income subcategory names (base + all additions across months).
+    var cats = DB.listCategories();
+    var incomeCat = cats.find(function(c){ return c.kind==='income'; });
+    var base = incomeCat ? (DB.listSubcategories()[incomeCat.name] || []) : [];
+    var adds = DB.getIncomeAdditions();
+    var seen = {}, names = [];
+    base.forEach(function(n){ if (!seen[n]) { seen[n]=1; names.push(n); } });
+    Object.keys(adds).forEach(function(m){
+      (adds[m]||[]).forEach(function(n){ if (!seen[n]) { seen[n]=1; names.push(n); } });
+    });
+    var pdGlobal = incomeCat && incomeCat.projectedDefault!=null ? incomeCat.projectedDefault : 7500;
+    var pdMap = (incomeCat && incomeCat.projectedDefaults) || {};
+
+    var incomeDefaultsHtml = names.map(function(n){
+      var v = pdMap[n] != null ? Number(pdMap[n]) : pdGlobal;
+      return '<tr>' +
+        '<td>'+esc(n)+'</td>' +
+        '<td><input type="number" class="input num inline-edit" data-inc-default="'+esc(n)+'" value="'+v+'"/></td>' +
+      '</tr>';
+    }).join('') || '<tr><td colspan="2" class="text-center muted">אין סוגי הכנסה</td></tr>';
+
     document.getElementById('page').innerHTML =
-      '<div class="grid grid-cols-2">' +
+      '<div class="grid" style="max-width:640px">' +
         '<div class="card">' +
-          '<h2 style="font-weight:600;margin-bottom:12px">כללי</h2>' +
-          '<label class="field"><span>מטבע</span><input class="input" id="s-currency" value="'+esc(s.currency||'₪')+'"/></label>' +
-          '<label class="field"><span>חודש ברירת-מחדל (YYYY-MM)</span><input class="input num" id="s-defmonth" value="'+esc(s.defaultMonth||'')+'"/></label>' +
-        '</div>' +
-        '<div class="card">' +
-          '<h2 style="font-weight:600;margin-bottom:12px">נתונים</h2>' +
-          '<div class="flex gap-2" style="flex-wrap:wrap">' +
-            '<button class="btn btn-ghost" id="export-json">ייצוא JSON</button>' +
-            '<label class="btn btn-ghost">ייבוא JSON<input type="file" id="import-json" accept="application/json" class="hidden"/></label>' +
-            '<label class="btn btn-ghost">ייבוא Excel<input type="file" id="import-xlsx-settings" accept=".xlsx,.xls" class="hidden"/></label>' +
-            '<button class="btn btn-danger" id="reset-all">איפוס נתונים</button>' +
+          '<div class="flex-between">' +
+            '<div>' +
+              '<h2 style="font-weight:600;margin-bottom:4px">מצב תצוגה</h2>' +
+              '<div class="muted" style="font-size:13px">החלפה בין מצב בהיר למצב כהה</div>' +
+            '</div>' +
+            '<label class="switch">' +
+              '<input type="checkbox" id="s-dark" '+checked+'/>' +
+              '<span class="slider"></span>' +
+            '</label>' +
           '</div>' +
-          '<p class="muted" style="font-size:12px;margin-top:12px">הנתונים נשמרים מקומית בדפדפן (localStorage). השתמש/י בייצוא לגיבוי.</p>' +
+        '</div>' +
+
+        '<div class="card">' +
+          '<h2 style="font-weight:600;margin-bottom:4px">ערכי ברירת-מחדל להכנסות</h2>' +
+          '<div class="muted" style="font-size:13px;margin-bottom:12px">כל חודש יתחיל עם הערכים האלה, עד שיועבר להם ערך אחר.</div>' +
+          '<table class="tbl">' +
+            '<thead><tr><th>סוג הכנסה</th><th>סכום ברירת-מחדל</th></tr></thead>' +
+            '<tbody>'+incomeDefaultsHtml+'</tbody>' +
+          '</table>' +
+          '<label class="field mt-3"><span>ברירת-מחדל כללית (כאשר אין ערך ספציפי)</span>' +
+            '<input type="number" class="input num inline-edit" id="s-inc-global" value="'+pdGlobal+'"/>' +
+          '</label>' +
         '</div>' +
       '</div>';
 
-    document.getElementById('s-currency').addEventListener('change', function(e){ DB.setSettings({ currency: e.target.value }); });
-    document.getElementById('s-defmonth').addEventListener('change', function(e){ DB.setSettings({ defaultMonth: e.target.value }); });
-    document.getElementById('export-json').addEventListener('click', exportAllJson);
-    document.getElementById('import-json').addEventListener('change', importAllJson);
-    document.getElementById('import-xlsx-settings').addEventListener('change', importXlsxHandler);
-    document.getElementById('reset-all').addEventListener('click', function(){
-      if (confirm('איפוס כל הנתונים? פעולה זו אינה הפיכה.')) { DB.resetAll(); location.reload(); }
+    document.getElementById('s-dark').addEventListener('change', function(e){
+      DB.setSettings({ darkMode: !!e.target.checked });
+      applyTheme();
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-inc-default]'), function(el){
+      el.addEventListener('change', function(e){
+        var name = el.getAttribute('data-inc-default');
+        var incs = DB.listCategories();
+        var inc = incs.find(function(c){ return c.kind==='income'; });
+        if (!inc) return;
+        var map = Object.assign({}, inc.projectedDefaults || {});
+        map[name] = Number(e.target.value)||0;
+        DB.upsertCategory(Object.assign({}, inc, { projectedDefaults: map }));
+      });
+    });
+    var incGlobal = document.getElementById('s-inc-global');
+    if (incGlobal) incGlobal.addEventListener('change', function(e){
+      var incs = DB.listCategories();
+      var inc = incs.find(function(c){ return c.kind==='income'; });
+      if (!inc) return;
+      DB.upsertCategory(Object.assign({}, inc, { projectedDefault: Number(e.target.value)||0 }));
     });
   }
 
@@ -794,25 +811,15 @@
         var input = document.getElementById('new-income');
         var name = input && input.value.trim();
         if (!name) return;
-        var cats = DB.listCategories();
-        var inc = cats.find(function(c){ return c.kind==='income'; });
-        if (!inc) return;
-        DB.addSubcategory(inc.name, name);
+        // Adds for the current month and all months after (forward-inherited).
+        DB.addIncomeForMonth(state.month, name);
         render();
         break;
       }
       case 'del-income': {
-        if (!confirm('להסיר את סוג ההכנסה "'+arg+'"?')) return;
-        var cats2 = DB.listCategories();
-        var inc2 = cats2.find(function(c){ return c.kind==='income'; });
-        if (!inc2) return;
-        DB.removeSubcategory(inc2.name, arg);
-        // Also clear any stored projected default for this subcategory.
-        if (inc2.projectedDefaults && inc2.projectedDefaults[arg] !== undefined) {
-          var pd = Object.assign({}, inc2.projectedDefaults);
-          delete pd[arg];
-          DB.upsertCategory(Object.assign({}, inc2, { projectedDefaults: pd }));
-        }
+        if (!confirm('להסיר את סוג ההכנסה "'+arg+'" מחודש זה בלבד?')) return;
+        // Local deletion — only this month is affected; other months unchanged.
+        DB.removeIncomeForMonth(state.month, arg);
         render();
         break;
       }

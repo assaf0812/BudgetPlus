@@ -8,6 +8,8 @@
     tx:   'budgetplus.transactions',
     settings: 'budgetplus.settings',
     seeded: 'budgetplus.seeded',
+    incomeAdd: 'budgetplus.incomeAdditions',
+    incomeDel: 'budgetplus.incomeDeletions',
   };
   function read(k, fb) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch(e) { return fb; } }
   function write(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
@@ -187,8 +189,47 @@
     write(K.tx, arr);
   }
 
+  // Per-month income subcategory overrides.
+  //   incomeAdditions: { [YYYY-MM]: string[] } — added in this month; effective from this month onward.
+  //   incomeDeletions: { [YYYY-MM]: string[] } — hidden in this month only (local).
+  function getIncomeAdditions() { return read(K.incomeAdd, {}); }
+  function getIncomeDeletions() { return read(K.incomeDel, {}); }
+
+  function addIncomeForMonth(ym, name) {
+    var adds = getIncomeAdditions();
+    adds[ym] = adds[ym] || [];
+    if (adds[ym].indexOf(name) === -1) adds[ym].push(name);
+    write(K.incomeAdd, adds);
+    // If this name was previously deleted in this same month, un-delete it.
+    var dels = getIncomeDeletions();
+    if (dels[ym]) {
+      dels[ym] = dels[ym].filter(function(n){ return n !== name; });
+      write(K.incomeDel, dels);
+    }
+  }
+  function removeIncomeForMonth(ym, name) {
+    var dels = getIncomeDeletions();
+    dels[ym] = dels[ym] || [];
+    if (dels[ym].indexOf(name) === -1) dels[ym].push(name);
+    write(K.incomeDel, dels);
+  }
+  // Effective income subcategories visible in month `ym`.
+  function getIncomeDescsForMonth(ym) {
+    var baseCat = listCategories().find(function(c){ return c.kind==='income'; });
+    var base = baseCat ? (listSubcategories()[baseCat.name] || []) : [];
+    var adds = getIncomeAdditions();
+    var extras = [];
+    Object.keys(adds).forEach(function(m){ if (m <= ym) extras = extras.concat(adds[m]); });
+    var dels = getIncomeDeletions()[ym] || [];
+    var seen = {}, result = [];
+    base.concat(extras).forEach(function(n){
+      if (!seen[n] && dels.indexOf(n) === -1) { seen[n] = 1; result.push(n); }
+    });
+    return result;
+  }
+
   // Settings
-  function getSettings() { return read(K.settings, { currency:'₪', defaultMonth: currentMonth() }); }
+  function getSettings() { return read(K.settings, { currency:'₪', defaultMonth: currentMonth(), darkMode: false }); }
   function setSettings(patch) { write(K.settings, Object.assign({}, getSettings(), patch)); }
 
   window.DB = {
@@ -198,6 +239,9 @@
     listSubcategories: listSubcategories, setSubcategories: setSubcategories, addSubcategory: addSubcategory, removeSubcategory: removeSubcategory,
     listPaymentMethods: listPaymentMethods, upsertPaymentMethod: upsertPaymentMethod, deletePaymentMethod: deletePaymentMethod,
     getBudgetsMap: getBudgetsMap, getMonthBudget: getMonthBudget, setMonthBudget: setMonthBudget,
+    getIncomeAdditions: getIncomeAdditions, getIncomeDeletions: getIncomeDeletions,
+    addIncomeForMonth: addIncomeForMonth, removeIncomeForMonth: removeIncomeForMonth,
+    getIncomeDescsForMonth: getIncomeDescsForMonth,
     listTransactions: listTransactions, listTxByMonth: listTxByMonth, upsertTransaction: upsertTransaction,
     deleteTransaction: deleteTransaction, bulkInsertTransactions: bulkInsertTransactions,
     getSettings: getSettings, setSettings: setSettings,

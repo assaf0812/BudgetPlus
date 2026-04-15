@@ -22,7 +22,7 @@
     var subs = DB.listSubcategories();
 
     var incomeCat = cats.find(function(c){ return c.kind==='income'; });
-    var incomeDescs = incomeCat ? (subs[incomeCat.name] || []) : [];
+    var incomeDescs = DB.getIncomeDescsForMonth(ym);
     var pdGlobal = incomeCat && incomeCat.projectedDefault!=null ? incomeCat.projectedDefault : 7500;
     var pdMap    = (incomeCat && incomeCat.projectedDefaults) || {};
     var incomeLines = incomeDescs.map(function(d){
