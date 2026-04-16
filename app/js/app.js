@@ -9,7 +9,7 @@
     document.body.classList.toggle('dark', !!DB.getSettings().darkMode);
   }
   applyTheme();
-
+//ASSAF
   var ROUTES = [
     { path:'month',      label:'חודש נוכחי',    icon:'📅' },
     { path:'yearly',     label:'סיכום שנתי',    icon:'📈' },
