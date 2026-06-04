@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import openpyxl; wb=openpyxl.load_workbook\\(r'C:/BudgetPlus/myAccountTemplate.xlsx', data_only=False\\); print\\('SHEETS:', wb.sheetnames\\)\")",
+      "Bash(pip install:*)",
+      "Bash(python _analyze.py)",
+      "Bash(PYTHONIOENCODING=utf-8 python _analyze.py)",
+      "Bash(PYTHONIOENCODING=utf-8 python _analyze2.py)",
+      "Bash(npm --version)",
+      "Bash(python -m http.server 5173 --bind 127.0.0.1)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:5173/)",
+      "Bash(npx --yes serve -l 5174 .)",
+      "Bash(npx --yes serve -l 5174)",
+      "Bash(npx -p serve serve -l 5174)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:5174/)",
+      "Bash(curl -s -o /dev/null -w \"localhost:%{http_code}\\\\n\" http://localhost:5174/)",
+      "Bash(curl -s -o /dev/null -w \"127.0.0.1:%{http_code}\\\\n\" http://127.0.0.1:5174/)",
+      "Bash(curl -s http://localhost:5174/)"
+    ]
+  }
+}
